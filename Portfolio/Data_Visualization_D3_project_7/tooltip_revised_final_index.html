@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="http://d3js.org/d3.v3.min.js"></script>
+    <style>
+    /*
+      Define the elements I will be working with in my thematic map.
+      */
+      circle {
+        fill: yellow;
+        stroke: black;
+        stroke-width: 0.7;
+        opacity: 0.7;
+      }
+
+      h2 {
+        text-align: center;
+        color: black;
+      }
+      h3 {
+        text-align: center;
+        color: black;
+      }
+      h4 {
+        text-align: center;
+        color: black;
+      }
+
+      div.years_buttons {
+        position: fixed;
+        top: 5px;
+        left: 50px;
+      }
+
+      div.years_buttons div {
+        background-color: rgb(240, 253, 103);
+        padding: 3px;
+        margin: 7px;
+      }
+
+      div.tooltip {
+        position: absolute;
+        text-align: center;
+        width: 60px;
+        height: 28px;
+        padding: 2px;
+        font: 12px sans-serif;
+        background: lightsteelblue;
+        border: 0px;
+        border-radius: 8px;
+        pointer-events: none;
+      }
+      </style>
+      <script type="text/javascript">
+      function draw(geo_data) {
+          "use strict";
+        var margin = 75,
+            width = 1400 - margin,
+            height = 600 - margin;
+
+        d3.select("body")
+            .append("h2")
+            .text("Places Kort Linden has Lived ");
+
+        d3.select("body")
+            .append("h3")
+            .text("17 moves in 29 Years but only 4 Regions of the USA");
+
+        d3.select("body")
+            .append("h4")
+            .text("Circle size displays relative time lived at each location");
+
+        var svg = d3.select("body")
+            .append("svg")
+            .attr("width", width + margin)
+            .attr("height", height + margin)
+            .append('g')
+            .attr('class', 'map');
+            /*
+              Defining which years are valid for display and which are not
+              so that my function below can play the animation.
+              */
+
+        var years = [];
+
+          for(var i = 1988; i < 2018; i += 1) {
+              if(i !== 1989 && i !== 1990 && i !== 1992 && i !== 1994 && i
+              !== 1996 && i !== 1998 && i !== 2000 && i !== 2002 && i
+              !== 2004 && i !== 2006 && i !== 2008 && i !== 2013 && i
+              !== 2015) { years.push(i);
+            };
+          }
+          /*
+            Using mercator projection to flatten map, scale, and translate
+            map from latitude and longitude to pixels
+            */
+
+        var projection = d3.geo.mercator()
+            .scale(560)
+            .translate([width / 1, height / .78]);
+
+        var path = d3.geo.path().projection(projection);
+
+        var map = svg.selectAll('path')
+            .data(geo_data.features)
+            .enter()
+            .append('path')
+            .attr('d', path)
+            .style('fill', 'lightBlue')
+            .style('stroke', 'black')
+            .style('stroke-width', 0.5);
+
+        function plot_points(data) {
+          /*
+            converting data to nested javascript leaves
+            */
+
+        function agg_year(leaves) {
+            var total = d3.sum(leaves, function(d) {
+                return d['duration'];
+                });
+
+            var coords = leaves.map(function(d) {
+                return projection([+d.long, +d.lat]);
+                });
+
+            var center_x = d3.mean(coords, function(d) {
+                return d[0];
+                });
+
+            var center_y = d3.mean(coords, function(d) {
+                return d[1];
+                });
+
+            var teams = d3.set();
+                /*
+                Displays which countries are activated.
+                  */
+
+                  leaves.forEach(function(d) {
+                  teams.add(d['team1']);
+                  teams.add(d['team2']);
+                });
+
+            return {
+                'duration' : total,
+                'x' : center_x,
+                'y' : center_y,
+                'teams' : teams.values()
+                };
+            }
+
+            var nested = d3.nest()
+                .key(function(d) {
+                    return d['date'].getUTCFullYear();
+                           })
+                .rollup(agg_year)
+                .entries(data);
+
+            var duration_max = d3.max(nested, function(d) {
+                return d.values['duration'];
+            });
+            /*
+              Setting the radius of the circle to match time lived in
+              each location.
+              */
+
+            var radius = d3.scale.sqrt()
+                .domain([0, duration_max])
+                .range([0, 15]);
+         /*
+              Defines the key as the reference for which to select
+              data to plot.
+
+                 */
+            function key_func(d) {
+                return d['key'];
+            }
+
+            svg.append('g')
+                .attr("class", "bubble")
+                .selectAll("circle")
+                .data(nested.sort(function(a, b) {
+                    return b.values['duration'] - a.values['duration'];
+               }), key_func)
+                .enter()
+                .append("circle")
+                .attr('cx', function(d) { return d.values['x']; })
+                .attr('cy', function(d) { return d.values['y']; })
+                .attr('r', function(d) {
+                    return radius(d.values['duration']);
+
+               })
+               /*
+                 Reads in the year from a standard
+                 date format and updates the title dynamically.
+                 */
+
+            function update(year) {
+                var filtered = nested.filter(function(d) {
+                    return new Date(d['key']).getUTCFullYear() === year;
+            });
+
+            d3.select("h2")
+                .text("Year Moved " + year);
+
+           var circles = svg.selectAll('circle')
+            .data(filtered, key_func);
+      /*
+                      clears out previous plotted point and starts over.
+                      */
+
+           circles.exit().remove();
+
+           circles.enter()
+              .append("circle")
+              .transition()
+              .duration(650)
+              .attr('cx', function(d) { return d.values['x']; })
+              .attr('cy', function(d) { return d.values['y']; })
+              .attr('r', function(d) {
+                  return radius(d.values['duration']);
+  /*     Tooltip code part 2 defines what happens on mouseover with the
+         help of the div.tooltip code in the start of the code.
+                                                        */
+           .on("mouseover", function(d) {
+              div.transition()
+                  .duration(200)
+                  .style("opacity", .9);
+              div .html(formatTime(d.date) + "<br/>"  + d.close)
+                  .style("left", (d3.event.pageX) + "px")
+                  .style("top", (d3.event.pageY - 28) + "px");
+                                      })
+            .on("mouseout", function(d) {
+                div.transition()
+                .duration(500)
+                .style("opacity", 0);
+
+
+
+                     });
+                     /*
+                       Defines what countries will be activated on the map
+                       and what colors will display.
+                       */
+
+          var countries = filtered[0].values['teams'];
+
+          function update_countries(d) {
+              if(countries.indexOf(d.properties.name) !== -1) {
+                  return "lightGreen";
+                    } else {
+                        return 'lightBlue';
+                  }
+              }
+
+          svg.selectAll('path')
+              .transition()
+              .duration(500)
+              .style('fill', update_countries)
+              .style('stroke', update_countries);
+
+          }
+
+          var year_idx = 0;
+          /*
+            Takes the variable 'years' created above to Define
+            which years to display and then applies those to the buttons
+            which display at the end of the animation.
+            */
+
+          var year_interval = setInterval(function() {
+              update(years[year_idx]);
+
+              year_idx++;
+
+              if(year_idx >= years.length) {
+                  clearInterval(year_interval);
+
+          var buttons = d3.select("body")
+              .append("div")
+              .attr("class", "years_buttons")
+              .selectAll("div")
+              .data(years)
+              .enter()
+              .append("div")
+              .text(function(d) {
+                  return d;
+                        });
+
+              buttons.on("click", function(d) {
+                  d3.select(".years_buttons")
+                  .selectAll("div")
+                  .transition()
+                  .duration(500)
+                  .style("color", "black")
+                  .style("background", "rgb(240, 253, 103)");
+
+                  d3.select(this)
+                      .transition()
+                      .duration(500)
+                      .style("background", "lightBlue")
+                      .style("color", "white");
+                  update(d);
+                  });
+                }
+              }, 1000);
+            }
+
+          var format = d3.time.format("%d-%m-%Y (%H:%M h)");
+      /*
+        read in tsv and define which variables I want in the data.
+        */
+
+          d3.tsv("kortlife2.tsv", function(d) {
+              d['duration'] = +d['duration'];
+              d['place'] = +d['place'];
+              d['date'] = format.parse(d['date']);
+                  return d;
+                }, plot_points);
+              };
+    </script>
+  </head>
+<body>
+  <script type="text/javascript">
+  /*
+    Use D3 to load the GeoJSON file
+    */
+
+d3.json("world_countries.json", draw);
+  </script>
+</body>
+</html>
