@@ -1,9 +1,7 @@
 Kort Linden, Data Analysis Portfolio
 
 About me:
-I am 29 years old, and I hold a BS in Business Administration from Babson College.
-I recently completed my Nano-Degree in Data Analysis from Udacity.com.  
-Under "portfolio", you will find the seven final projects that I
+I am 29 years old, and I hold a BS in Business Administration from Babson College. I recently completed my Nano-Degree in Data Analysis from Udacity.com. Under "portfolio", you will find the seven final projects that I
 completed for my Nano-Degree.
 
 Additionally, I have several projects (currently submitted for industry
