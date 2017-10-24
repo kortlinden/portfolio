@@ -1,4 +1,3 @@
-# portfolio
 Kort Linden, Data Analysis Portfolio
 
 About me:
